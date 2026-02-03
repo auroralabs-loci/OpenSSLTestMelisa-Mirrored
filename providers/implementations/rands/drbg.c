@@ -21,6 +21,8 @@
 #include "crypto/rand_pool.h"
 #include "prov/provider_ctx.h"
 #include "prov/providercommon.h"
+#include "prov/fipscommon.h"
+#include "crypto/context.h"
 
 /*
  * Support framework for NIST SP 800-90A DRBG
@@ -279,7 +281,7 @@ typedef struct prov_drbg_nonce_global_st {
  * to be in a different global data object. Otherwise we will go into an
  * infinite recursion loop.
  */
-static void *prov_drbg_nonce_ossl_ctx_new(OSSL_LIB_CTX *libctx)
+void *ossl_prov_drbg_nonce_ctx_new(OSSL_LIB_CTX *libctx)
 {
     PROV_DRBG_NONCE_GLOBAL *dngbl = OPENSSL_zalloc(sizeof(*dngbl));
 
@@ -295,7 +297,7 @@ static void *prov_drbg_nonce_ossl_ctx_new(OSSL_LIB_CTX *libctx)
     return dngbl;
 }
 
-static void prov_drbg_nonce_ossl_ctx_free(void *vdngbl)
+void ossl_prov_drbg_nonce_ctx_free(void *vdngbl)
 {
     PROV_DRBG_NONCE_GLOBAL *dngbl = vdngbl;
 
@@ -307,12 +309,6 @@ static void prov_drbg_nonce_ossl_ctx_free(void *vdngbl)
     OPENSSL_free(dngbl);
 }
 
-static const OSSL_LIB_CTX_METHOD drbg_nonce_ossl_ctx_method = {
-    OSSL_LIB_CTX_METHOD_DEFAULT_PRIORITY,
-    prov_drbg_nonce_ossl_ctx_new,
-    prov_drbg_nonce_ossl_ctx_free,
-};
-
 /* Get a nonce from the operating system */
 static size_t prov_drbg_get_nonce(PROV_DRBG *drbg, unsigned char **pout,
                                   size_t min_len, size_t max_len)
@@ -321,8 +317,7 @@ static size_t prov_drbg_get_nonce(PROV_DRBG *drbg, unsigned char **pout,
     unsigned char *buf = NULL;
     OSSL_LIB_CTX *libctx = ossl_prov_ctx_get0_libctx(drbg->provctx);
     PROV_DRBG_NONCE_GLOBAL *dngbl
-        = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_DRBG_NONCE_INDEX,
-                                &drbg_nonce_ossl_ctx_method);
+        = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_DRBG_NONCE_INDEX);
     struct {
         void *drbg;
         int count;
@@ -936,5 +931,33 @@ int ossl_drbg_set_ctx_params(PROV_DRBG *drbg, const OSSL_PARAM params[])
     p = OSSL_PARAM_locate_const(params, OSSL_DRBG_PARAM_RESEED_TIME_INTERVAL);
     if (p != NULL && !OSSL_PARAM_get_time_t(p, &drbg->reseed_time_interval))
         return 0;
+    return 1;
+}
+
+/* Confirm digest is allowed to be used with a DRBG */
+int ossl_drbg_verify_digest(ossl_unused OSSL_LIB_CTX *libctx, const EVP_MD *md)
+{
+#ifdef FIPS_MODULE
+    /* FIPS 140-3 IG D.R limited DRBG digests to a specific set */
+    static const char *const allowed_digests[] = {
+        "SHA1",                     /* SHA 1 allowed */
+        "SHA2-256", "SHA2-512",     /* non-truncated SHA2 allowed */
+        "SHA3-256", "SHA3-512",     /* non-truncated SHA3 allowed */
+    };
+    size_t i;
+
+    if (FIPS_restricted_drbg_digests_enabled(libctx)) {
+        for (i = 0; i < OSSL_NELEM(allowed_digests); i++)
+            if (EVP_MD_is_a(md, allowed_digests[i]))
+                return 1;
+        ERR_raise(ERR_LIB_PROV, PROV_R_DIGEST_NOT_ALLOWED);
+        return 0;
+    }
+#endif
+    /* Outside of FIPS, any digests that are not XOF are allowed */
+    if ((EVP_MD_get_flags(md) & EVP_MD_FLAG_XOF) != 0) {
+        ERR_raise(ERR_LIB_PROV, PROV_R_XOF_DIGESTS_NOT_ALLOWED);
+        return 0;
+    }
     return 1;
 }

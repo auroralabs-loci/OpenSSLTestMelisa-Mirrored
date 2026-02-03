@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2016-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -29,12 +29,13 @@
 #include "prov/providercommon.h"
 #include "prov/implementations.h"
 #include "prov/provider_util.h"
-#include "e_os.h"
+#include "internal/e_os.h"
 
 #define HKDF_MAXBUF 2048
 #define HKDF_MAXINFO (32*1024)
 
 static OSSL_FUNC_kdf_newctx_fn kdf_hkdf_new;
+static OSSL_FUNC_kdf_dupctx_fn kdf_hkdf_dup;
 static OSSL_FUNC_kdf_freectx_fn kdf_hkdf_free;
 static OSSL_FUNC_kdf_reset_fn kdf_hkdf_reset;
 static OSSL_FUNC_kdf_derive_fn kdf_hkdf_derive;
@@ -125,6 +126,36 @@ static void kdf_hkdf_reset(void *vctx)
     OPENSSL_clear_free(ctx->info, ctx->info_len);
     memset(ctx, 0, sizeof(*ctx));
     ctx->provctx = provctx;
+}
+
+static void *kdf_hkdf_dup(void *vctx)
+{
+    const KDF_HKDF *src = (const KDF_HKDF *)vctx;
+    KDF_HKDF *dest;
+
+    dest = kdf_hkdf_new(src->provctx);
+    if (dest != NULL) {
+        if (!ossl_prov_memdup(src->salt, src->salt_len, &dest->salt,
+                              &dest->salt_len)
+                || !ossl_prov_memdup(src->key, src->key_len,
+                                     &dest->key , &dest->key_len)
+                || !ossl_prov_memdup(src->prefix, src->prefix_len,
+                                     &dest->prefix, &dest->prefix_len)
+                || !ossl_prov_memdup(src->label, src->label_len,
+                                     &dest->label, &dest->label_len)
+                || !ossl_prov_memdup(src->data, src->data_len,
+                                     &dest->data, &dest->data_len)
+                || !ossl_prov_memdup(src->info, src->info_len,
+                                     &dest->info, &dest->info_len)
+                || !ossl_prov_digest_copy(&dest->digest, &src->digest))
+            goto err;
+        dest->mode = src->mode;
+    }
+    return dest;
+
+ err:
+    kdf_hkdf_free(dest);
+    return NULL;
 }
 
 static size_t kdf_hkdf_size(KDF_HKDF *ctx)
@@ -233,11 +264,13 @@ static int hkdf_common_set_ctx_params(KDF_HKDF *ctx, const OSSL_PARAM params[])
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_SALT)) != NULL) {
-        OPENSSL_free(ctx->salt);
-        ctx->salt = NULL;
-        if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->salt, 0,
-                                         &ctx->salt_len))
-            return 0;
+        if (p->data_size != 0 && p->data != NULL) {
+            OPENSSL_free(ctx->salt);
+            ctx->salt = NULL;
+            if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->salt, 0,
+                                             &ctx->salt_len))
+                return 0;
+        }
     }
 
     return 1;
@@ -361,6 +394,7 @@ static const OSSL_PARAM *kdf_hkdf_gettable_ctx_params(ossl_unused void *ctx,
 
 const OSSL_DISPATCH ossl_kdf_hkdf_functions[] = {
     { OSSL_FUNC_KDF_NEWCTX, (void(*)(void))kdf_hkdf_new },
+    { OSSL_FUNC_KDF_DUPCTX, (void(*)(void))kdf_hkdf_dup },
     { OSSL_FUNC_KDF_FREECTX, (void(*)(void))kdf_hkdf_free },
     { OSSL_FUNC_KDF_RESET, (void(*)(void))kdf_hkdf_reset },
     { OSSL_FUNC_KDF_DERIVE, (void(*)(void))kdf_hkdf_derive },
@@ -776,6 +810,7 @@ static const OSSL_PARAM *kdf_tls1_3_settable_ctx_params(ossl_unused void *ctx,
 
 const OSSL_DISPATCH ossl_kdf_tls1_3_kdf_functions[] = {
     { OSSL_FUNC_KDF_NEWCTX, (void(*)(void))kdf_hkdf_new },
+    { OSSL_FUNC_KDF_DUPCTX, (void(*)(void))kdf_hkdf_dup },
     { OSSL_FUNC_KDF_FREECTX, (void(*)(void))kdf_hkdf_free },
     { OSSL_FUNC_KDF_RESET, (void(*)(void))kdf_hkdf_reset },
     { OSSL_FUNC_KDF_DERIVE, (void(*)(void))kdf_tls1_3_derive },

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2019-2024 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2019, Oracle and/or its affiliates.  All rights reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
@@ -23,6 +23,7 @@
 #include "crypto/lhash.h"
 #include "crypto/sparse_array.h"
 #include "property_local.h"
+#include "crypto/context.h"
 
 /*
  * The number of elements in the query cache before we initiate a flush.
@@ -52,7 +53,7 @@ typedef struct {
     char body[1];
 } QUERY;
 
-DEFINE_LHASH_OF(QUERY);
+DEFINE_LHASH_OF_EX(QUERY);
 
 typedef struct {
     int nid;
@@ -109,7 +110,7 @@ static void ossl_method_cache_flush_alg(OSSL_METHOD_STORE *store,
 static void ossl_method_cache_flush(OSSL_METHOD_STORE *store, int nid);
 
 /* Global properties are stored per library context */
-static void ossl_ctx_global_properties_free(void *vglobp)
+void ossl_ctx_global_properties_free(void *vglobp)
 {
     OSSL_GLOBAL_PROPERTIES *globp = vglobp;
 
@@ -119,16 +120,10 @@ static void ossl_ctx_global_properties_free(void *vglobp)
     }
 }
 
-static void *ossl_ctx_global_properties_new(OSSL_LIB_CTX *ctx)
+void *ossl_ctx_global_properties_new(OSSL_LIB_CTX *ctx)
 {
     return OPENSSL_zalloc(sizeof(OSSL_GLOBAL_PROPERTIES));
 }
-
-static const OSSL_LIB_CTX_METHOD ossl_ctx_global_properties_method = {
-    OSSL_LIB_CTX_METHOD_DEFAULT_PRIORITY,
-    ossl_ctx_global_properties_new,
-    ossl_ctx_global_properties_free,
-};
 
 OSSL_PROPERTY_LIST **ossl_ctx_global_properties(OSSL_LIB_CTX *libctx,
                                                 ossl_unused int loadconfig)
@@ -139,8 +134,7 @@ OSSL_PROPERTY_LIST **ossl_ctx_global_properties(OSSL_LIB_CTX *libctx,
     if (loadconfig && !OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG, NULL))
         return NULL;
 #endif
-    globp = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_GLOBAL_PROPERTIES,
-                                  &ossl_ctx_global_properties_method);
+    globp = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_GLOBAL_PROPERTIES);
 
     return globp != NULL ? &globp->list : NULL;
 }
@@ -149,8 +143,7 @@ OSSL_PROPERTY_LIST **ossl_ctx_global_properties(OSSL_LIB_CTX *libctx,
 int ossl_global_properties_no_mirrored(OSSL_LIB_CTX *libctx)
 {
     OSSL_GLOBAL_PROPERTIES *globp
-        = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_GLOBAL_PROPERTIES,
-                                &ossl_ctx_global_properties_method);
+        = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_GLOBAL_PROPERTIES);
 
     return globp != NULL && globp->no_mirrored ? 1 : 0;
 }
@@ -158,8 +151,7 @@ int ossl_global_properties_no_mirrored(OSSL_LIB_CTX *libctx)
 void ossl_global_properties_stop_mirroring(OSSL_LIB_CTX *libctx)
 {
     OSSL_GLOBAL_PROPERTIES *globp
-        = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_GLOBAL_PROPERTIES,
-                                &ossl_ctx_global_properties_method);
+        = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_GLOBAL_PROPERTIES);
 
     if (globp != NULL)
         globp->no_mirrored = 1;
@@ -329,7 +321,7 @@ int ossl_method_store_add(OSSL_METHOD_STORE *store, const OSSL_PROVIDER *prov,
 
     /* Insert into the hash table if required */
     if (!ossl_property_write_lock(store)) {
-        impl_free(impl);
+        OPENSSL_free(impl);
         return 0;
     }
     ossl_method_cache_flush(store, nid);

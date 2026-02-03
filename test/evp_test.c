@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2015-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -352,10 +352,8 @@ static int digest_test_init(EVP_TEST *t, const char *alg)
     if ((digest = fetched_digest = EVP_MD_fetch(libctx, alg, NULL)) == NULL
         && (digest = EVP_get_digestbyname(alg)) == NULL)
         return 0;
-    if (!TEST_ptr(mdat = OPENSSL_zalloc(sizeof(*mdat)))) {
-        EVP_MD_free(fetched_digest);
+    if (!TEST_ptr(mdat = OPENSSL_zalloc(sizeof(*mdat))))
         return 0;
-    }
     t->data = mdat;
     mdat->digest = digest;
     mdat->fetched_digest = fetched_digest;
@@ -395,6 +393,26 @@ static int digest_test_parse(EVP_TEST *t,
 static int digest_update_fn(void *ctx, const unsigned char *buf, size_t buflen)
 {
     return EVP_DigestUpdate(ctx, buf, buflen);
+}
+
+static int test_duplicate_md_ctx(EVP_TEST *t, EVP_MD_CTX *mctx)
+{
+    char dont[] = "touch";
+
+    if (!TEST_ptr(mctx))
+        return 0;
+    if (!EVP_DigestFinalXOF(mctx, (unsigned char *)dont, 0)) {
+        EVP_MD_CTX_free(mctx);
+        t->err = "DIGESTFINALXOF_ERROR";
+        return 0;
+    }
+    if (!TEST_str_eq(dont, "touch")) {
+        EVP_MD_CTX_free(mctx);
+        t->err = "DIGESTFINALXOF_ERROR";
+        return 0;
+    }
+    EVP_MD_CTX_free(mctx);
+    return 1;
 }
 
 static int digest_test_run(EVP_TEST *t)
@@ -438,26 +456,19 @@ static int digest_test_run(EVP_TEST *t)
     xof = (EVP_MD_get_flags(expected->digest) & EVP_MD_FLAG_XOF) != 0;
     if (xof) {
         EVP_MD_CTX *mctx_cpy;
-        char dont[] = "touch";
 
         if (!TEST_ptr(mctx_cpy = EVP_MD_CTX_new())) {
             goto err;
         }
-        if (!EVP_MD_CTX_copy(mctx_cpy, mctx)) {
+        if (!TEST_true(EVP_MD_CTX_copy(mctx_cpy, mctx))) {
             EVP_MD_CTX_free(mctx_cpy);
             goto err;
-        }
-        if (!EVP_DigestFinalXOF(mctx_cpy, (unsigned char *)dont, 0)) {
-            EVP_MD_CTX_free(mctx_cpy);
-            t->err = "DIGESTFINALXOF_ERROR";
+        } else if (!test_duplicate_md_ctx(t, mctx_cpy)) {
             goto err;
         }
-        if (!TEST_str_eq(dont, "touch")) {
-            EVP_MD_CTX_free(mctx_cpy);
-            t->err = "DIGESTFINALXOF_ERROR";
+
+        if (!test_duplicate_md_ctx(t, EVP_MD_CTX_dup(mctx)))
             goto err;
-        }
-        EVP_MD_CTX_free(mctx_cpy);
 
         got_len = expected->output_len;
         if (!EVP_DigestFinalXOF(mctx, got, got_len)) {
@@ -697,7 +708,7 @@ static int cipher_test_enc(EVP_TEST *t, int enc,
     size_t in_len, out_len, donelen = 0;
     int ok = 0, tmplen, chunklen, tmpflen, i;
     EVP_CIPHER_CTX *ctx_base = NULL;
-    EVP_CIPHER_CTX *ctx = NULL;
+    EVP_CIPHER_CTX *ctx = NULL, *duped;
     int fips_dupctx_supported = (fips_provider_version_gt(libctx, 3, 0, 12)
                                 && fips_provider_version_lt(libctx, 3, 1, 0))
                                 || fips_provider_version_ge(libctx, 3, 1, 3);
@@ -845,6 +856,12 @@ static int cipher_test_enc(EVP_TEST *t, int enc,
     } else {
         EVP_CIPHER_CTX_free(ctx_base);
         ctx_base = NULL;
+    }
+    /* Likewise for dup */
+    duped = EVP_CIPHER_CTX_dup(ctx);
+    if (duped != NULL) {
+        EVP_CIPHER_CTX_free(ctx);
+        ctx = duped;
     }
     ERR_pop_to_mark();
 
@@ -1530,9 +1547,7 @@ static int mac_test_run_mac(EVP_TEST *t)
         t->err = "MAC_CREATE_ERROR";
         goto err;
     }
-    if (fips_provider_version_gt(libctx, 3, 1, 4)
-        || (fips_provider_version_lt(libctx, 3, 1, 0)
-            && fips_provider_version_gt(libctx, 3, 0, 12)))
+    if (fips_provider_version_gt(libctx, 3, 1, 4))
         size_before_init = EVP_MAC_CTX_get_mac_size(ctx);
     if (!EVP_MAC_init(ctx, expected->key, expected->key_len, params)) {
         t->err = "MAC_INIT_ERROR";
@@ -2780,6 +2795,13 @@ static int kdf_test_ctrl(EVP_TEST *t, EVP_KDF_CTX *kctx,
     else
         *p++ = '\0';
 
+    if (strcmp(name, "r") == 0
+        && OSSL_PARAM_locate_const(defs, name) == NULL) {
+        TEST_info("skipping, setting 'r' is unsupported");
+        t->skip = 1;
+        goto end;
+    }
+
     rv = OSSL_PARAM_allocate_from_text(kdata->p, defs, name, p,
                                        strlen(p), NULL);
     *++kdata->p = OSSL_PARAM_construct_end();
@@ -2793,6 +2815,7 @@ static int kdf_test_ctrl(EVP_TEST *t, EVP_KDF_CTX *kctx,
             TEST_info("skipping, '%s' is disabled", p);
             t->skip = 1;
         }
+        goto end;
     }
 
     if ((strcmp(name, "cipher") == 0
@@ -2800,8 +2823,14 @@ static int kdf_test_ctrl(EVP_TEST *t, EVP_KDF_CTX *kctx,
         && is_cipher_disabled(p)) {
         TEST_info("skipping, '%s' is disabled", p);
         t->skip = 1;
+        goto end;
     }
-
+    if ((strcmp(name, "mac") == 0)
+        && is_mac_disabled(p)) {
+        TEST_info("skipping, '%s' is disabled", p);
+        t->skip = 1;
+    }
+ end:
     OPENSSL_free(name);
     return 1;
 }
@@ -2823,6 +2852,7 @@ static int kdf_test_run(EVP_TEST *t)
     KDF_DATA *expected = t->data;
     unsigned char *got = NULL;
     size_t got_len = expected->output_len;
+    EVP_KDF_CTX *ctx;
 
     if (!EVP_KDF_CTX_set_params(expected->ctx, expected->params)) {
         t->err = "KDF_CTRL_ERROR";
@@ -2831,6 +2861,10 @@ static int kdf_test_run(EVP_TEST *t)
     if (!TEST_ptr(got = OPENSSL_malloc(got_len == 0 ? 1 : got_len))) {
         t->err = "INTERNAL_ERROR";
         goto err;
+    }
+    if ((ctx = EVP_KDF_CTX_dup(expected->ctx)) != NULL) {
+        EVP_KDF_CTX_free(expected->ctx);
+        expected->ctx = ctx;
     }
     if (EVP_KDF_derive(expected->ctx, got, got_len, NULL) <= 0) {
         t->err = "KDF_DERIVE_ERROR";
@@ -3962,9 +3996,7 @@ static int run_file_tests(int i)
     clear_test(t);
 
     free_key_list(public_keys);
-    public_keys = NULL;
     free_key_list(private_keys);
-    private_keys = NULL;
     BIO_free(t->s.key);
     c = t->s.errors;
     OPENSSL_free(t);

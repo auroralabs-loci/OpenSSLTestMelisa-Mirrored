@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -276,7 +276,7 @@ _dopr(char **sbuffer,
                 break;
             case 'E':
                 flags |= DP_F_UP;
-                /* fall thru */
+                /* fall through */
             case 'e':
                 if (cflags == DP_C_LDOUBLE)
                     fvalue = va_arg(args, LDOUBLE);
@@ -288,7 +288,7 @@ _dopr(char **sbuffer,
                 break;
             case 'G':
                 flags |= DP_F_UP;
-                /* fall thru */
+                /* fall through */
             case 'g':
                 if (cflags == DP_C_LDOUBLE)
                     fvalue = va_arg(args, LDOUBLE);
@@ -535,10 +535,6 @@ static LDOUBLE abs_val(LDOUBLE value)
     LDOUBLE result = value;
     if (value < 0)
         result = -value;
-    if (result > 0 && result / 2 == result) /* INF */
-        result = 0;
-    else if (result != result) /* NAN */
-        result = 0;
     return result;
 }
 
@@ -594,9 +590,6 @@ fmtfp(char **sbuffer,
         signvalue = '+';
     else if (flags & DP_F_SPACE)
         signvalue = ' ';
-    ufvalue = abs_val(fvalue);
-    if (ufvalue == 0 && fvalue != 0) /* INF or NAN? */
-        signvalue = '?';
 
     /*
      * G_FORMAT sometimes prints like E_FORMAT and sometimes like F_FORMAT
@@ -604,12 +597,12 @@ fmtfp(char **sbuffer,
      * that from here on.
      */
     if (style == G_FORMAT) {
-        if (ufvalue == 0.0) {
+        if (fvalue == 0.0) {
             realstyle = F_FORMAT;
-        } else if (ufvalue < 0.0001) {
+        } else if (fvalue < 0.0001) {
             realstyle = E_FORMAT;
-        } else if ((max == 0 && ufvalue >= 10)
-                   || (max > 0 && ufvalue >= pow_10(max))) {
+        } else if ((max == 0 && fvalue >= 10)
+                    || (max > 0 && fvalue >= pow_10(max))) {
             realstyle = E_FORMAT;
         } else {
             realstyle = F_FORMAT;
@@ -619,9 +612,9 @@ fmtfp(char **sbuffer,
     }
 
     if (style != F_FORMAT) {
-        tmpvalue = ufvalue;
+        tmpvalue = fvalue;
         /* Calculate the exponent */
-        if (ufvalue != 0.0) {
+        if (fvalue != 0.0) {
             while (tmpvalue < 1) {
                 tmpvalue *= 10;
                 exp--;
@@ -658,9 +651,9 @@ fmtfp(char **sbuffer,
             }
         }
         if (realstyle == E_FORMAT)
-            ufvalue = tmpvalue;
+            fvalue = tmpvalue;
     }
-
+    ufvalue = abs_val(fvalue);
     /*
      * By subtracting 65535 (2^16-1) we cancel the low order 15 bits
      * of ULONG_MAX to avoid using imprecise floating point values.

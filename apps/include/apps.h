@@ -10,7 +10,7 @@
 #ifndef OSSL_APPS_H
 # define OSSL_APPS_H
 
-# include "e_os.h" /* struct timeval for DTLS */
+# include "internal/e_os.h" /* struct timeval for DTLS */
 # include "internal/nelem.h"
 # include "internal/sockets.h" /* for openssl_fdset() */
 # include "internal/cryptlib.h"  /* ossl_assert() */
@@ -94,6 +94,7 @@ typedef struct args_st {
 /* We need both wrap and the "real" function because libcrypto uses both. */
 int wrap_password_callback(char *buf, int bufsiz, int verify, void *cb_data);
 
+int chopup_args(ARGS *arg, char *buf);
 void dump_cert_text(BIO *out, X509 *x);
 void print_name(BIO *out, const char *title, const X509_NAME *nm);
 void print_bignum_var(BIO *, const BIGNUM *, const char*,

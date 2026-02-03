@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2015-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -716,9 +716,7 @@ static EVP_PKEY *make_key_fromdata(char *keytype, OSSL_PARAM *params)
 
     if (!TEST_ptr(pctx = EVP_PKEY_CTX_new_from_name(testctx, keytype, testpropq)))
         goto err;
-    /* Check that premature EVP_PKEY_CTX_set_params() fails gracefully */
-    if (!TEST_int_eq(EVP_PKEY_CTX_set_params(pctx, params), 0)
-        || !TEST_int_gt(EVP_PKEY_fromdata_init(pctx), 0)
+    if (!TEST_int_gt(EVP_PKEY_fromdata_init(pctx), 0)
         || !TEST_int_gt(EVP_PKEY_fromdata(pctx, &tmp_pkey, EVP_PKEY_KEYPAIR,
                                           params), 0))
         goto err;
@@ -2472,7 +2470,7 @@ static int test_CMAC_keygen(void)
     if (!TEST_int_gt(EVP_PKEY_keygen_init(kctx), 0)
             || !TEST_int_gt(EVP_PKEY_CTX_ctrl(kctx, -1, EVP_PKEY_OP_KEYGEN,
                                             EVP_PKEY_CTRL_CIPHER,
-                                            0, (void *)EVP_aes_256_ecb()), 0)
+                                            0, (void *)EVP_aes_256_cbc()), 0)
             || !TEST_int_gt(EVP_PKEY_CTX_ctrl(kctx, -1, EVP_PKEY_OP_KEYGEN,
                                             EVP_PKEY_CTRL_SET_MAC_KEY,
                                             sizeof(key), (void *)key), 0)
@@ -2488,7 +2486,7 @@ static int test_CMAC_keygen(void)
      * Test a CMAC key using the direct method, and compare with the mac
      * created above.
      */
-    pkey = EVP_PKEY_new_CMAC_key(NULL, key, sizeof(key), EVP_aes_256_ecb());
+    pkey = EVP_PKEY_new_CMAC_key(NULL, key, sizeof(key), EVP_aes_256_cbc());
     if (!TEST_ptr(pkey)
             || !TEST_true(get_cmac_val(pkey, mac2))
             || !TEST_mem_eq(mac, sizeof(mac), mac2, sizeof(mac2)))
@@ -2596,7 +2594,6 @@ static int test_empty_salt_info_HKDF(void)
     size_t outlen;
     int ret = 0;
     unsigned char salt[] = "";
-    unsigned char fake[] = "0123456789";
     unsigned char key[] = "012345678901234567890123456789";
     unsigned char info[] = "";
     const unsigned char expected[] = {
@@ -2613,8 +2610,6 @@ static int test_empty_salt_info_HKDF(void)
 
     if (!TEST_int_gt(EVP_PKEY_derive_init(pctx), 0)
             || !TEST_int_gt(EVP_PKEY_CTX_set_hkdf_md(pctx, EVP_sha256()), 0)
-            || !TEST_int_gt(EVP_PKEY_CTX_set1_hkdf_salt(pctx, fake,
-                                                        sizeof(fake) - 1), 0)
             || !TEST_int_gt(EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt,
                                                         sizeof(salt) - 1), 0)
             || !TEST_int_gt(EVP_PKEY_CTX_set1_hkdf_key(pctx, key,
@@ -3010,48 +3005,6 @@ static int test_RSA_OAEP_set_null_label(void)
     return ret;
 }
 
-static int test_RSA_encrypt(void)
-{
-    int ret = 0;
-    EVP_PKEY *pkey = NULL;
-    EVP_PKEY_CTX *pctx = NULL;
-    unsigned char *cbuf = NULL, *pbuf = NULL;
-    size_t clen = 0, plen = 0;
-
-    if (!TEST_ptr(pkey = load_example_rsa_key())
-        || !TEST_ptr(pctx = EVP_PKEY_CTX_new_from_pkey(testctx,
-                                                       pkey, testpropq))
-        || !TEST_int_gt(EVP_PKEY_encrypt_init(pctx), 0)
-        || !TEST_int_gt(EVP_PKEY_encrypt(pctx, cbuf, &clen, kMsg, sizeof(kMsg)), 0)
-        || !TEST_ptr(cbuf = OPENSSL_malloc(clen))
-        || !TEST_int_gt(EVP_PKEY_encrypt(pctx, cbuf, &clen, kMsg, sizeof(kMsg)), 0))
-        goto done;
-
-    /* Require failure when the output buffer is too small */
-    plen = clen - 1;
-    if (!TEST_int_le(EVP_PKEY_encrypt(pctx, cbuf, &plen, kMsg, sizeof(kMsg)), 0))
-        goto done;
-    /* flush error stack */
-    TEST_openssl_errors();
-
-    /* Check decryption of encrypted result */
-    if (!TEST_int_gt(EVP_PKEY_decrypt_init(pctx), 0)
-        || !TEST_int_gt(EVP_PKEY_decrypt(pctx, pbuf, &plen, cbuf, clen), 0)
-        || !TEST_ptr(pbuf = OPENSSL_malloc(plen))
-        || !TEST_int_gt(EVP_PKEY_decrypt(pctx, pbuf, &plen, cbuf, clen), 0)
-        || !TEST_mem_eq(pbuf, plen, kMsg, sizeof(kMsg))
-        || !TEST_int_gt(EVP_PKEY_encrypt_init(pctx), 0))
-        goto done;
-
-    ret = 1;
-done:
-    EVP_PKEY_CTX_free(pctx);
-    EVP_PKEY_free(pkey);
-    OPENSSL_free(cbuf);
-    OPENSSL_free(pbuf);
-    return ret;
-}
-
 #if !defined(OPENSSL_NO_CHACHA) && !defined(OPENSSL_NO_POLY1305)
 static int test_decrypt_null_chunks(void)
 {
@@ -3270,9 +3223,9 @@ static int test_pkey_ctx_fail_without_provider(int tst)
 
     /*
      * We check for certain algos in the null provider.
-     * If an algo is expected to have a provider keymgmt, contructing an
+     * If an algo is expected to have a provider keymgmt, constructing an
      * EVP_PKEY_CTX is expected to fail (return NULL).
-     * Otherwise, if it's expected to have legacy support, contructing an
+     * Otherwise, if it's expected to have legacy support, constructing an
      * EVP_PKEY_CTX is expected to succeed (return non-NULL).
      */
     switch (tst) {
@@ -4767,6 +4720,7 @@ static int custom_md_cleanup(EVP_MD_CTX *ctx)
 
 static int test_custom_md_meth(void)
 {
+    ASN1_OBJECT *o = NULL;
     EVP_MD_CTX *mdctx = NULL;
     EVP_MD *tmp = NULL;
     char mess[] = "Test Message\n";
@@ -4812,8 +4766,21 @@ static int test_custom_md_meth(void)
             || !TEST_int_eq(custom_md_cleanup_called, 1))
         goto err;
 
+    if (!TEST_int_eq(OBJ_create("1.3.6.1.4.1.16604.998866.1",
+                                "custom-md", "custom-md"), NID_undef)
+            || !TEST_int_eq(ERR_GET_LIB(ERR_peek_error()), ERR_LIB_OBJ)
+            || !TEST_int_eq(ERR_GET_REASON(ERR_get_error()), OBJ_R_OID_EXISTS))
+        goto err;
+
+    o = ASN1_OBJECT_create(nid, (unsigned char *)
+                                "\53\6\1\4\1\201\201\134\274\373\122\1", 12,
+                                "custom-md", "custom-md");
+    if (!TEST_int_eq(OBJ_add_object(o), nid))
+        goto err;
+
     testresult = 1;
  err:
+    ASN1_OBJECT_free(o);
     EVP_MD_CTX_free(mdctx);
     EVP_MD_meth_free(tmp);
     return testresult;
@@ -5440,7 +5407,9 @@ int setup_tests(void)
             /* Swap the libctx to test non-default context only */
             nullprov = OSSL_PROVIDER_load(NULL, "null");
             deflprov = OSSL_PROVIDER_load(testctx, "default");
+#ifndef OPENSSL_SYS_TANDEM
             lgcyprov = OSSL_PROVIDER_load(testctx, "legacy");
+#endif
             break;
         case OPT_TEST_CASES:
             break;
@@ -5506,7 +5475,6 @@ int setup_tests(void)
     ADD_TEST(test_RSA_get_set_params);
     ADD_TEST(test_RSA_OAEP_set_get_params);
     ADD_TEST(test_RSA_OAEP_set_null_label);
-    ADD_TEST(test_RSA_encrypt);
 #if !defined(OPENSSL_NO_CHACHA) && !defined(OPENSSL_NO_POLY1305)
     ADD_TEST(test_decrypt_null_chunks);
 #endif
@@ -5590,6 +5558,8 @@ void cleanup_tests(void)
 {
     OSSL_PROVIDER_unload(nullprov);
     OSSL_PROVIDER_unload(deflprov);
+#ifndef OPENSSL_SYS_TANDEM
     OSSL_PROVIDER_unload(lgcyprov);
+#endif
     OSSL_LIB_CTX_free(testctx);
 }

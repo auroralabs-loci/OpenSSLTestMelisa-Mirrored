@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2023 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -44,7 +44,6 @@
 #include <openssl/rand.h>
 #include <openssl/bn.h>
 #include <openssl/ssl.h>
-#include <openssl/store.h>
 #include <openssl/core_names.h>
 #include "s_apps.h"
 #include "apps.h"
@@ -79,16 +78,55 @@ static int set_table_opts(unsigned long *flags, const char *arg,
                           const NAME_EX_TBL * in_tbl);
 static int set_multi_opts(unsigned long *flags, const char *arg,
                           const NAME_EX_TBL * in_tbl);
-static
-int load_key_certs_crls_suppress(const char *uri, int format, int maybe_stdin,
-                                 const char *pass, const char *desc,
-                                 EVP_PKEY **ppkey, EVP_PKEY **ppubkey,
-                                 EVP_PKEY **pparams,
-                                 X509 **pcert, STACK_OF(X509) **pcerts,
-                                 X509_CRL **pcrl, STACK_OF(X509_CRL) **pcrls,
-                                 int suppress_decode_errors);
-
 int app_init(long mesgwin);
+
+int chopup_args(ARGS *arg, char *buf)
+{
+    int quoted;
+    char c = '\0', *p = NULL;
+
+    arg->argc = 0;
+    if (arg->size == 0) {
+        arg->size = 20;
+        arg->argv = app_malloc(sizeof(*arg->argv) * arg->size, "argv space");
+    }
+
+    for (p = buf;;) {
+        /* Skip whitespace. */
+        while (*p && isspace(_UC(*p)))
+            p++;
+        if (*p == '\0')
+            break;
+
+        /* The start of something good :-) */
+        if (arg->argc >= arg->size) {
+            char **tmp;
+            arg->size += 20;
+            tmp = OPENSSL_realloc(arg->argv, sizeof(*arg->argv) * arg->size);
+            if (tmp == NULL)
+                return 0;
+            arg->argv = tmp;
+        }
+        quoted = *p == '\'' || *p == '"';
+        if (quoted)
+            c = *p++;
+        arg->argv[arg->argc++] = p;
+
+        /* now look for the end of this */
+        if (quoted) {
+            while (*p && *p != c)
+                p++;
+            *p++ = '\0';
+        } else {
+            while (*p && !isspace(_UC(*p)))
+                p++;
+            if (*p)
+                *p++ = '\0';
+        }
+    }
+    arg->argv[arg->argc] = NULL;
+    return 1;
+}
 
 #ifndef APP_INIT
 int app_init(long mesgwin)
@@ -421,16 +459,17 @@ X509 *load_cert_pass(const char *uri, int format, int maybe_stdin,
 
     if (desc == NULL)
         desc = "certificate";
-    if (IS_HTTPS(uri))
+    if (IS_HTTPS(uri)) {
         BIO_printf(bio_err, "Loading %s over HTTPS is unsupported\n", desc);
-    else if (IS_HTTP(uri))
+    } else if (IS_HTTP(uri)) {
         cert = X509_load_http(uri, NULL, NULL, 0 /* timeout */);
-    else
+        if (cert == NULL) {
+            ERR_print_errors(bio_err);
+            BIO_printf(bio_err, "Unable to load %s from %s\n", desc, uri);
+        }
+    } else {
         (void)load_key_certs_crls(uri, format, maybe_stdin, pass, desc,
                                   NULL, NULL, NULL, &cert, NULL, NULL, NULL);
-    if (cert == NULL) {
-        BIO_printf(bio_err, "Unable to load %s\n", desc);
-        ERR_print_errors(bio_err);
     }
     return cert;
 }
@@ -442,16 +481,17 @@ X509_CRL *load_crl(const char *uri, int format, int maybe_stdin,
 
     if (desc == NULL)
         desc = "CRL";
-    if (IS_HTTPS(uri))
+    if (IS_HTTPS(uri)) {
         BIO_printf(bio_err, "Loading %s over HTTPS is unsupported\n", desc);
-    else if (IS_HTTP(uri))
+    } else if (IS_HTTP(uri)) {
         crl = X509_CRL_load_http(uri, NULL, NULL, 0 /* timeout */);
-    else
+        if (crl == NULL) {
+            ERR_print_errors(bio_err);
+            BIO_printf(bio_err, "Unable to load %s from %s\n", desc, uri);
+        }
+    } else {
         (void)load_key_certs_crls(uri, format, maybe_stdin, NULL, desc,
                                   NULL, NULL,  NULL, NULL, NULL, &crl, NULL);
-    if (crl == NULL) {
-        BIO_printf(bio_err, "Unable to load %s\n", desc);
-        ERR_print_errors(bio_err);
     }
     return crl;
 }
@@ -478,8 +518,8 @@ X509_REQ *load_csr(const char *file, int format, const char *desc)
 
  end:
     if (req == NULL) {
-        BIO_printf(bio_err, "Unable to load %s\n", desc);
         ERR_print_errors(bio_err);
+        BIO_printf(bio_err, "Unable to load %s\n", desc);
     }
     BIO_free(in);
     return req;
@@ -540,23 +580,23 @@ EVP_PKEY *load_keyparams_suppress(const char *uri, int format, int maybe_stdin,
                                  int suppress_decode_errors)
 {
     EVP_PKEY *params = NULL;
+    BIO *bio_bak = bio_err;
 
     if (desc == NULL)
         desc = "key parameters";
-
-    (void)load_key_certs_crls_suppress(uri, format, maybe_stdin, NULL, desc,
-                                       NULL, NULL, &params, NULL, NULL, NULL,
-                                       NULL, suppress_decode_errors);
+    if (suppress_decode_errors)
+        bio_err = NULL;
+    (void)load_key_certs_crls(uri, format, maybe_stdin, NULL, desc,
+                              NULL, NULL, &params, NULL, NULL, NULL, NULL);
     if (params != NULL && keytype != NULL && !EVP_PKEY_is_a(params, keytype)) {
-        if (!suppress_decode_errors) {
-            BIO_printf(bio_err,
-                       "Unable to load %s from %s (unexpected parameters type)\n",
-                       desc, uri);
-            ERR_print_errors(bio_err);
-        }
+        ERR_print_errors(bio_err);
+        BIO_printf(bio_err,
+                   "Unable to load %s from %s (unexpected parameters type)\n",
+                   desc, uri);
         EVP_PKEY_free(params);
         params = NULL;
     }
+    bio_err = bio_bak;
     return params;
 }
 
@@ -641,6 +681,8 @@ int load_cert_certs(const char *uri,
     int ret = 0;
     char *pass_string;
 
+    if (desc == NULL)
+        desc = pcerts == NULL ? "certificate" : "certificates";
     if (exclude_http && (OPENSSL_strncasecmp(uri, "http://", 7) == 0
                          || OPENSSL_strncasecmp(uri, "https://", 8) == 0)) {
         BIO_printf(bio_err, "error: HTTP retrieval not allowed for %s\n", desc);
@@ -648,8 +690,7 @@ int load_cert_certs(const char *uri,
     }
     pass_string = get_passwd(pass, desc);
     ret = load_key_certs_crls(uri, FORMAT_UNDEF, 0, pass_string, desc,
-                              NULL, NULL, NULL,
-                              pcert, pcerts, NULL, NULL);
+                              NULL, NULL, NULL, pcert, pcerts, NULL, NULL);
     clear_free(pass_string);
 
     if (ret) {
@@ -752,10 +793,12 @@ X509_STORE *load_certstore(char *input, const char *pass, const char *desc,
 int load_certs(const char *uri, int maybe_stdin, STACK_OF(X509) **certs,
                const char *pass, const char *desc)
 {
-    int was_NULL = *certs == NULL;
-    int ret = load_key_certs_crls(uri, FORMAT_UNDEF, maybe_stdin,
-                                  pass, desc, NULL, NULL,
-                                  NULL, NULL, certs, NULL, NULL);
+    int ret, was_NULL = *certs == NULL;
+
+    if (desc == NULL)
+        desc = "certificates";
+    ret = load_key_certs_crls(uri, FORMAT_UNDEF, maybe_stdin, pass, desc,
+                              NULL, NULL, NULL, NULL, certs, NULL, NULL);
 
     if (!ret && was_NULL) {
         sk_X509_pop_free(*certs, X509_free);
@@ -771,10 +814,12 @@ int load_certs(const char *uri, int maybe_stdin, STACK_OF(X509) **certs,
 int load_crls(const char *uri, STACK_OF(X509_CRL) **crls,
               const char *pass, const char *desc)
 {
-    int was_NULL = *crls == NULL;
-    int ret = load_key_certs_crls(uri, FORMAT_UNDEF, 0, pass, desc,
-                                  NULL, NULL, NULL,
-                                  NULL, NULL, NULL, crls);
+    int ret, was_NULL = *crls == NULL;
+
+    if (desc == NULL)
+        desc = "CRLs";
+    ret = load_key_certs_crls(uri, FORMAT_UNDEF, 0, pass, desc,
+                              NULL, NULL, NULL, NULL, NULL, NULL, crls);
 
     if (!ret && was_NULL) {
         sk_X509_CRL_pop_free(*crls, X509_CRL_free);
@@ -809,14 +854,12 @@ static const char *format2string(int format)
  * In any case (also on error) the caller is responsible for freeing all members
  * of *pcerts and *pcrls (as far as they are not NULL).
  */
-static
-int load_key_certs_crls_suppress(const char *uri, int format, int maybe_stdin,
-                                 const char *pass, const char *desc,
-                                 EVP_PKEY **ppkey, EVP_PKEY **ppubkey,
-                                 EVP_PKEY **pparams,
-                                 X509 **pcert, STACK_OF(X509) **pcerts,
-                                 X509_CRL **pcrl, STACK_OF(X509_CRL) **pcrls,
-                                 int suppress_decode_errors)
+int load_key_certs_crls(const char *uri, int format, int maybe_stdin,
+                        const char *pass, const char *desc,
+                        EVP_PKEY **ppkey, EVP_PKEY **ppubkey,
+                        EVP_PKEY **pparams,
+                        X509 **pcert, STACK_OF(X509) **pcerts,
+                        X509_CRL **pcrl, STACK_OF(X509_CRL) **pcrls)
 {
     PW_CB_DATA uidata;
     OSSL_STORE_CTX *ctx = NULL;
@@ -835,6 +878,7 @@ int load_key_certs_crls_suppress(const char *uri, int format, int maybe_stdin,
     OSSL_PARAM itp[2];
     const OSSL_PARAM *params = NULL;
 
+    ERR_set_mark();
     if (ppkey != NULL) {
         *ppkey = NULL;
         cnt_expectations++;
@@ -877,9 +921,9 @@ int load_key_certs_crls_suppress(const char *uri, int format, int maybe_stdin,
         SET_EXPECT(expect, OSSL_STORE_INFO_CRL);
     }
     if (cnt_expectations == 0) {
-        BIO_printf(bio_err, "Internal error: nothing to load from %s\n",
-                   uri != NULL ? uri : "<stdin>");
-        return 0;
+        BIO_printf(bio_err, "Internal error: no expectation to load");
+        failed = "anything";
+        goto end;
     }
 
     uidata.password = pass;
@@ -1017,14 +1061,14 @@ int load_key_certs_crls_suppress(const char *uri, int format, int maybe_stdin,
                 any = 1;
             failed = "CRL";
         }
-        if (!suppress_decode_errors) {
-            if (failed != NULL)
-                BIO_printf(bio_err, "Could not read");
-            if (any)
-                BIO_printf(bio_err, " any");
-        }
+        if (failed != NULL)
+            BIO_printf(bio_err, "Could not read");
+        if (any)
+            BIO_printf(bio_err, " any");
     }
-    if (!suppress_decode_errors && failed != NULL) {
+    if (failed != NULL) {
+        unsigned long err = ERR_peek_last_error();
+
         if (desc != NULL && strstr(desc, failed) != NULL) {
             BIO_printf(bio_err, " %s", desc);
         } else {
@@ -1034,25 +1078,21 @@ int load_key_certs_crls_suppress(const char *uri, int format, int maybe_stdin,
         }
         if (uri != NULL)
             BIO_printf(bio_err, " from %s", uri);
+        if (ERR_SYSTEM_ERROR(err)) {
+            /* provide more readable diagnostic output */
+            BIO_printf(bio_err, ": %s", strerror(ERR_GET_REASON(err)));
+            ERR_pop_to_mark();
+            ERR_set_mark();
+        }
         BIO_printf(bio_err, "\n");
         ERR_print_errors(bio_err);
     }
-    if (suppress_decode_errors || failed == NULL)
-        /* clear any spurious errors */
-        ERR_clear_error();
+    if (bio_err == NULL || failed == NULL)
+        /* clear any suppressed or spurious errors */
+        ERR_pop_to_mark();
+    else
+        ERR_clear_last_mark();
     return failed == NULL;
-}
-
-int load_key_certs_crls(const char *uri, int format, int maybe_stdin,
-                        const char *pass, const char *desc,
-                        EVP_PKEY **ppkey, EVP_PKEY **ppubkey,
-                        EVP_PKEY **pparams,
-                        X509 **pcert, STACK_OF(X509) **pcerts,
-                        X509_CRL **pcrl, STACK_OF(X509_CRL) **pcrls)
-{
-    return load_key_certs_crls_suppress(uri, format, maybe_stdin, pass, desc,
-                                        ppkey, ppubkey, pparams, pcert, pcerts,
-                                        pcrl, pcrls, 0);
 }
 
 #define X509V3_EXT_UNKNOWN_MASK         (0xfL << 16)
@@ -1640,9 +1680,6 @@ CA_DB *load_index(const char *dbfile, DB_ATTR *db_attr)
     }
 
     retdb->dbfname = OPENSSL_strdup(dbfile);
-    if (retdb->dbfname == NULL)
-        goto err;
-
 #ifndef OPENSSL_NO_POSIX_IO
     retdb->dbst = dbst;
 #endif
