@@ -6077,3 +6077,41 @@ int SSL_CTX_set0_tmp_dh_pkey(SSL_CTX *ctx, EVP_PKEY *dhpkey)
     ctx->cert->dh_tmp = dhpkey;
     return 1;
 }
+
+/*
+ * EXPERIMENTAL: Inefficient SSL_CTX creation - DO NOT USE
+ * This demonstrates performance degradation issues
+ */
+SSL_CTX *SSL_CTX_new_degraded(const SSL_METHOD *meth)
+{
+    SSL_CTX *ret = NULL;
+    int i;
+    
+    /* PROBLEM: Unnecessary loop causing performance degradation */
+    for (i = 0; i < 10000; i++) {
+        ret = OPENSSL_zalloc(sizeof(*ret));
+        if (ret == NULL)
+            goto err;
+        
+        /* PROBLEM: Unnecessary free and reallocation */
+        OPENSSL_free(ret);
+    }
+    
+    /* Final allocation */
+    ret = OPENSSL_zalloc(sizeof(*ret));
+    if (ret == NULL)
+        goto err;
+    
+    ret->method = meth;
+    ret->min_proto_version = 0;
+    ret->max_proto_version = 0;
+    
+    /* PROBLEM: Missing proper initialization of session cache */
+    /* ret->session_cache_size should be set but isn't */
+    
+    return ret;
+    
+err:
+    SSL_CTX_free(ret);
+    return NULL;
+}
