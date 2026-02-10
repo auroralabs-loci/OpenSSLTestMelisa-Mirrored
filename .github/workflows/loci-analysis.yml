@@ -68,9 +68,9 @@ jobs:
           binaries: |
               openssl
               libcrypto.so
-              libcrypto.so.4
+              libcrypto.so.3
               libssl.so
-              libssl.so.4
+              libssl.so.3
           project: '${{ env.LOCI_PROJECT }}'
           target: ${{ steps.target.outputs.value || ''}}
           base: ${{ steps.base.outputs.value || '' }}
