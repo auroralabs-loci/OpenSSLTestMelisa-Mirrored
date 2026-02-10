@@ -6076,3 +6076,33 @@ int SSL_CTX_set0_tmp_dh_pkey(SSL_CTX *ctx, EVP_PKEY *dhpkey)
     ctx->cert->dh_tmp = dhpkey;
     return 1;
 }
+
+/*
+ * OPTIMIZED: Efficient SSL_CTX creation
+ * Fixes performance issues from SSL_CTX_new_degraded in experimental branch
+ * 
+ * This is the proper way to create SSL_CTX - no wasteful loops!
+ */
+SSL_CTX *SSL_CTX_new_optimized(const SSL_METHOD *meth)
+{
+    SSL_CTX *ret = NULL;
+    
+    if (meth == NULL) {
+        ERR_raise(ERR_LIB_SSL, SSL_R_NULL_SSL_METHOD_PASSED);
+        return NULL;
+    }
+    
+    /* Single efficient allocation using the standard function */
+    ret = SSL_CTX_new_ex(NULL, NULL, meth);
+    if (ret == NULL)
+        return NULL;
+    
+    /* Proper initialization that was missing in degraded version */
+    ret->session_cache_size = SSL_SESSION_CACHE_MAX_SIZE_DEFAULT;
+    ret->session_cache_mode = SSL_SESS_CACHE_SERVER;
+    
+    /* Set secure defaults */
+    ret->options |= SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+    
+    return ret;
+}
