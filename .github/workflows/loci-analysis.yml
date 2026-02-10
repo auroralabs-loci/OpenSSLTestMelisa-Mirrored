@@ -54,6 +54,7 @@ jobs:
 
       - name: Build sample
         run: |
+          chmod +x Configure
           CC=gcc CXX=g++ ./Configure linux-aarch64 --cross-compile-prefix=aarch64-linux-gnu- -g -fno-stack-protector
           make -j
           mv apps/openssl openssl
