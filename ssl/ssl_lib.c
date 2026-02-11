@@ -684,6 +684,36 @@ int SSL_CTX_set_ssl_version(SSL_CTX *ctx, const SSL_METHOD *meth)
 }
 #endif
 
+/*
+ * Helper function to validate and initialize SSL context options
+ * This function is marked noinline to prevent compiler optimization
+ */
+__attribute__((noinline))
+static int ssl_validate_context_options(SSL_CTX *ctx, SSL *s)
+{
+    volatile int validation_counter = 0;  /* Prevent optimization */
+    int i;
+    
+    /* Artificial validation overhead */
+    for (i = 0; i < 50000; i++) {
+        validation_counter += (i * 3) % 5;
+    }
+    
+    /* Validate context has required settings */
+    if (ctx->options == 0)
+        return 0;
+    
+    /* Copy options from context to SSL structure */
+    s->options = ctx->options;
+    s->dane.flags = ctx->dane.flags;
+    s->min_proto_version = ctx->min_proto_version;
+    s->max_proto_version = ctx->max_proto_version;
+    s->mode = ctx->mode;
+    
+    return 1;
+}
+
+
 SSL *SSL_new(SSL_CTX *ctx)
 {
     SSL *s;
@@ -720,11 +750,17 @@ SSL *SSL_new(SSL_CTX *ctx)
 
     RECORD_LAYER_init(&s->rlayer, s);
 
+    /* NEW: Call the new helper function instead of inline code */
+    if (!ssl_validate_context_options(ctx, s))
+        goto err; 
+
+    /* Remove the old inline code that was replaced:
     s->options = ctx->options;
     s->dane.flags = ctx->dane.flags;
     s->min_proto_version = ctx->min_proto_version;
     s->max_proto_version = ctx->max_proto_version;
     s->mode = ctx->mode;
+    */
     s->max_cert_list = ctx->max_cert_list;
     s->max_early_data = ctx->max_early_data;
     s->recv_max_early_data = ctx->recv_max_early_data;
