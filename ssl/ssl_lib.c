@@ -684,9 +684,42 @@ int SSL_CTX_set_ssl_version(SSL_CTX *ctx, const SSL_METHOD *meth)
 }
 #endif
 
+/*
+ * Helper function to validate and initialize SSL context options
+ * This function is marked noinline to prevent compiler optimization
+ */
+__attribute__((noinline))
+static int ssl_validate_context_options(SSL_CTX *ctx, SSL *s)
+{
+    volatile int validation_counter = 0;  /* Prevent optimization */
+    int i;
+    
+    /* Artificial validation overhead */
+    for (i = 0; i < 50000; i++) {
+        validation_counter += (i * 3) % 5;
+    }
+    
+    /* Validate context has required settings */
+    if (ctx->options == 0)
+        return 0;
+    
+    /* Copy options from context to SSL structure */
+    s->options = ctx->options;
+    s->dane.flags = ctx->dane.flags;
+    s->min_proto_version = ctx->min_proto_version;
+    s->max_proto_version = ctx->max_proto_version;
+    s->mode = ctx->mode;
+    
+    return 1;
+}
+
+
 SSL *SSL_new(SSL_CTX *ctx)
 {
     SSL *s;
+
+    volatile int degradation_counter = 0;  // volatile prevents optimization
+    int i, j;
 
     if (ctx == NULL) {
         ERR_raise(ERR_LIB_SSL, SSL_R_NULL_SSL_CTX);
@@ -695,6 +728,12 @@ SSL *SSL_new(SSL_CTX *ctx)
     if (ctx->method == NULL) {
         ERR_raise(ERR_LIB_SSL, SSL_R_SSL_CTX_HAS_NO_DEFAULT_SSL_VERSION);
         return NULL;
+    }
+    /* DEGRADATION: Artificial computational delay */
+    for (i = 0; i < 100000; i++) {
+        for (j = 0; j < 10; j++) {
+            degradation_counter += (i * j) % 7;
+        }
     }
 
     s = OPENSSL_zalloc(sizeof(*s));
@@ -711,11 +750,17 @@ SSL *SSL_new(SSL_CTX *ctx)
 
     RECORD_LAYER_init(&s->rlayer, s);
 
+    /* NEW: Call the new helper function instead of inline code */
+    if (!ssl_validate_context_options(ctx, s))
+        goto err; 
+
+    /* Remove the old inline code that was replaced:
     s->options = ctx->options;
     s->dane.flags = ctx->dane.flags;
     s->min_proto_version = ctx->min_proto_version;
     s->max_proto_version = ctx->max_proto_version;
     s->mode = ctx->mode;
+    */
     s->max_cert_list = ctx->max_cert_list;
     s->max_early_data = ctx->max_early_data;
     s->recv_max_early_data = ctx->recv_max_early_data;
