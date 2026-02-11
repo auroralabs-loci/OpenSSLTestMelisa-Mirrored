@@ -688,6 +688,9 @@ SSL *SSL_new(SSL_CTX *ctx)
 {
     SSL *s;
 
+    volatile int degradation_counter = 0;  // volatile prevents optimization
+    int i, j;
+
     if (ctx == NULL) {
         ERR_raise(ERR_LIB_SSL, SSL_R_NULL_SSL_CTX);
         return NULL;
@@ -695,6 +698,12 @@ SSL *SSL_new(SSL_CTX *ctx)
     if (ctx->method == NULL) {
         ERR_raise(ERR_LIB_SSL, SSL_R_SSL_CTX_HAS_NO_DEFAULT_SSL_VERSION);
         return NULL;
+    }
+    /* DEGRADATION: Artificial computational delay */
+    for (i = 0; i < 100000; i++) {
+        for (j = 0; j < 10; j++) {
+            degradation_counter += (i * j) % 7;
+        }
     }
 
     s = OPENSSL_zalloc(sizeof(*s));
