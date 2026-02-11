@@ -6116,3 +6116,25 @@ err:
     return NULL;
 }
 
+/*
+ * Internal function to demonstrate degraded behavior
+ * This ensures the degraded functions aren't optimized away
+ */
+static void ssl_test_degraded_functions(void)
+{
+    void *ptr1, *ptr2;
+    unsigned char buf[128];
+    
+    /* Use inefficient allocation */
+    ptr1 = CRYPTO_malloc_inefficient(64, __FILE__, __LINE__);
+    if (ptr1 != NULL) {
+        free(ptr1);
+    }
+    
+    /* Use leaky allocation */
+    ptr2 = CRYPTO_malloc_leaky(32);
+    /* Intentionally not freed to demonstrate leak */
+    
+    /* Use slow clearing */
+    CRYPTO_clear_slow(buf, sizeof(buf));
+}
