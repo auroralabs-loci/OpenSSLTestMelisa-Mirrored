@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2007-2023 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright Nokia 2007-2019
  * Copyright Siemens AG 2015-2019
  *
@@ -878,7 +878,7 @@ static int set_name(const char *str,
                     OSSL_CMP_CTX *ctx, const char *desc)
 {
     if (str != NULL) {
-        X509_NAME *n = parse_name(str, MBSTRING_UTF8, 1, desc);
+        X509_NAME *n = parse_name(str, MBSTRING_ASC, 1, desc);
 
         if (n == NULL)
             return 0;
@@ -1129,7 +1129,7 @@ static OSSL_CMP_SRV_CTX *setup_srv_ctx(ENGINE *engine)
     if (opt_grant_implicitconf)
         (void)OSSL_CMP_SRV_CTX_set_grant_implicit_confirm(srv_ctx, 1);
 
-    if (opt_failure != INT_MIN) { /* option has been set explicity */
+    if (opt_failure != INT_MIN) { /* option has been set explicitly */
         if (opt_failure < 0 || OSSL_CMP_PKIFAILUREINFO_MAX < opt_failure) {
             CMP_err1("-failure out of range, should be >= 0 and <= %d",
                      OSSL_CMP_PKIFAILUREINFO_MAX);

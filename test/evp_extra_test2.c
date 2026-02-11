@@ -1177,6 +1177,21 @@ static int test_rsa_pss_sign(void)
     return ret;
 }
 
+static int test_evp_md_ctx_dup(void)
+{
+    EVP_MD_CTX *mdctx;
+    EVP_MD_CTX *copyctx = NULL;
+    int ret;
+
+    /* test copying freshly initialized context */
+    ret = TEST_ptr(mdctx = EVP_MD_CTX_new())
+          && TEST_ptr(copyctx = EVP_MD_CTX_dup(mdctx));
+
+    EVP_MD_CTX_free(mdctx);
+    EVP_MD_CTX_free(copyctx);
+    return ret;
+}
+
 static int test_evp_md_ctx_copy(void)
 {
     EVP_MD_CTX *mdctx = NULL;
@@ -1280,6 +1295,7 @@ int setup_tests(void)
     ADD_ALL_TESTS(test_PEM_read_bio_negative, OSSL_NELEM(keydata));
     ADD_ALL_TESTS(test_PEM_read_bio_negative_wrong_password, 2);
     ADD_TEST(test_rsa_pss_sign);
+    ADD_TEST(test_evp_md_ctx_dup);
     ADD_TEST(test_evp_md_ctx_copy);
     ADD_ALL_TESTS(test_provider_unload_effective, 2);
 #if !defined OPENSSL_NO_DES && !defined OPENSSL_NO_MD5

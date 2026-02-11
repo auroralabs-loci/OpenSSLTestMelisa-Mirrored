@@ -11,10 +11,30 @@ See the individual manual pages for details.
 =head1 DESCRIPTION
 
 This guide details the changes required to migrate to new versions of OpenSSL.
-Currently this covers OpenSSL 3.0. For earlier versions refer to
+Currently this covers OpenSSL 3.0 & 3.1. For earlier versions refer to
 L<https://github.com/openssl/openssl/blob/master/CHANGES.md>.
 For an overview of some of the key concepts introduced in OpenSSL 3.0 see
 L<crypto(7)>.
+
+=head1 OPENSSL 3.1
+
+=head2 Main Changes from OpenSSL 3.0
+
+The FIPS provider in OpenSSL 3.1 includes some non-FIPS validated algorithms,
+consequently the property query C<fips=yes> is mandatory for applications that
+want to operate in a FIPS approved manner.  The algorithms are:
+
+=over 4
+
+=item Triple DES ECB
+
+=item Triple DES CBC
+
+=item EdDSA
+
+=back
+
+There are no other changes requiring additional migration measures since OpenSSL 3.0.
 
 =head1 OPENSSL 3.0
 
@@ -355,7 +375,7 @@ This code is now always set to zero. Related functions are deprecated.
 =head4 STACK and HASH macros have been cleaned up
 
 The type-safe wrappers are declared everywhere and implemented once.
-See L<DEFINE_STACK_OF(3)> and L<DECLARE_LHASH_OF(3)>.
+See L<DEFINE_STACK_OF(3)> and L<DEFINE_LHASH_OF_EX(3)>.
 
 =head4 The RAND_DRBG subsystem has been removed
 
@@ -596,13 +616,13 @@ The code needs to be amended to look like this:
 Support for TLSv1.3 has been added.
 
 This has a number of implications for SSL/TLS applications. See the
-L<TLS1.3 page|https://github.com/openssl/openssl/wiki/TLS1.3> for further details.
+L<TLS1.3 page|https://wiki.openssl.org/index.php/TLS1.3> for further details.
 
 =back
 
 More details about the breaking changes between OpenSSL versions 1.0.2 and 1.1.0
 can be found on the
-L<OpenSSL 1.1.0 Changes page|https://github.com/openssl/openssl/wiki/OpenSSL_1.1.0_Changes>.
+L<OpenSSL 1.1.0 Changes page|https://wiki.openssl.org/index.php/OpenSSL_1.1.0_Changes>.
 
 =head3 Upgrading from the OpenSSL 2.0 FIPS Object Module
 
@@ -2484,7 +2504,7 @@ The migration guide was created for OpenSSL 3.0.
 
 =head1 COPYRIGHT
 
-Copyright 2021-2025 The OpenSSL Project Authors. All Rights Reserved.
+Copyright 2021-2024 The OpenSSL Project Authors. All Rights Reserved.
 
 Licensed under the Apache License 2.0 (the "License").  You may not use
 this file except in compliance with the License.  You can obtain a copy

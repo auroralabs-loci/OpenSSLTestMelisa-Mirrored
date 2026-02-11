@@ -52,7 +52,7 @@ my @app = qw(openssl cmp);
 # the CMP server configuration consists of:
 my $ca_dn;      # The CA's Distinguished Name
 my $server_dn;  # The server's Distinguished Name
-my $server_host;# The server's host name or IP address
+my $server_host;# The server's hostname or IP address
 my $server_port;# The server's port
 my $server_tls; # The server's TLS port, if any, or 0
 my $server_path;# The server's CMP alias
@@ -274,18 +274,12 @@ sub start_mock_server {
     print "Pid is: $pid\n";
     if ($server_port == 0) {
         # Find out the actual server port
-        my $pid0 = $pid;
         while (<$server_fh>) {
             print "Server output: $_";
             next if m/using section/;
             s/\R$//;                # Better chomp
             ($server_port, $pid) = ($1, $2) if /^ACCEPT\s.*:(\d+) PID=(\d+)$/;
             last; # Do not loop further to prevent hangs on server misbehavior
-        }
-        if ($pid0 != $pid) {
-            # kill the shell process
-            kill('KILL', $pid0);
-            waitpid($pid0, 0);
         }
     }
     unless ($server_port > 0) {

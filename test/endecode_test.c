@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2020-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -25,6 +25,10 @@
 
 #include "helpers/predefined_dhparams.h"
 #include "testutil.h"
+
+#ifdef STATIC_LEGACY
+OSSL_provider_init_fn ossl_legacy_provider_init;
+#endif
 
 /* Extended test macros to allow passing file & line number */
 #define TEST_FL_ptr(a)               test_ptr(file, line, #a, a)
@@ -1360,6 +1364,16 @@ int setup_tests(void)
 
     /* FIPS(3.0.0): provider imports explicit params but they won't work #17998 */
     is_fips_3_0_0 = is_fips && fips_provider_version_eq(testctx, 3, 0, 0);
+
+#ifdef STATIC_LEGACY
+    /*
+     * This test is always statically linked against libcrypto. We must not
+     * attempt to load legacy.so that might be dynamically linked against
+     * libcrypto. Instead we use a built-in version of the legacy provider.
+     */
+    if (!OSSL_PROVIDER_add_builtin(testctx, "legacy", ossl_legacy_provider_init))
+        return 0;
+#endif
 
     /* Separate provider/ctx for generating the test data */
     if (!TEST_ptr(keyctx = OSSL_LIB_CTX_new()))

@@ -108,7 +108,7 @@ int ossl_mac_key_up_ref(MAC_KEY *mackey)
 
     /* This is effectively doing a new operation on the MAC_KEY and should be
      * adequately guarded again modules' error states.  However, both current
-     * calls here are guarded propery in signature/mac_legacy.c.  Thus, it
+     * calls here are guarded properly in signature/mac_legacy.c.  Thus, it
      * could be removed here.  The concern is that something in the future
      * might call this function without adequate guards.  It's a cheap call,
      * it seems best to leave it even though it is currently redundant.
@@ -526,9 +526,6 @@ static void *mac_gen(void *genctx, OSSL_CALLBACK *cb, void *cbarg)
 static void mac_gen_cleanup(void *genctx)
 {
     struct mac_gen_ctx *gctx = genctx;
-
-    if (gctx == NULL)
-        return;
 
     OPENSSL_secure_clear_free(gctx->priv_key, gctx->priv_key_len);
     ossl_prov_cipher_reset(&gctx->cipher);

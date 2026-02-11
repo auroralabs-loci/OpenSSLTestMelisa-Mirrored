@@ -7,6 +7,7 @@ release. For more details please read the CHANGES file.
 OpenSSL Releases
 ----------------
 
+ - [OpenSSL 3.1](#openssl-31)
  - [OpenSSL 3.0](#openssl-30)
  - [OpenSSL 1.1.1](#openssl-111)
  - [OpenSSL 1.1.0](#openssl-110)
@@ -15,24 +16,16 @@ OpenSSL Releases
  - [OpenSSL 1.0.0](#openssl-100)
  - [OpenSSL 0.9.x](#openssl-09x)
 
-OpenSSL 3.0
+OpenSSL 3.1
 -----------
 
-### Major changes between OpenSSL 3.0.17 and OpenSSL 3.0.18 [under development]
+### Major changes between OpenSSL 3.1.8 and OpenSSL 3.1.9 [under development]
 
   * none
 
-### Major changes between OpenSSL 3.0.16 and OpenSSL 3.0.17 [1 Jul 2025]
+### Major changes between OpenSSL 3.1.7 and OpenSSL 3.1.8 [11 Feb 2025]
 
-OpenSSL 3.0.17 is a bug fix release.
-
-This release incorporates the following bug fixes and mitigations:
-
-  * Miscellaneous minor bug fixes.
-
-### Major changes between OpenSSL 3.0.15 and OpenSSL 3.0.16 [11 Feb 2025]
-
-OpenSSL 3.0.16 is a security patch release. The most severe CVE fixed in this
+OpenSSL 3.1.8 is a security patch release. The most severe CVE fixed in this
 release is Low.
 
 This release incorporates the following bug fixes and mitigations:
@@ -44,9 +37,9 @@ This release incorporates the following bug fixes and mitigations:
     curve parameters.
     ([CVE-2024-9143])
 
-### Major changes between OpenSSL 3.0.14 and OpenSSL 3.0.15 [3 Sep 2024]
+### Major changes between OpenSSL 3.1.6 and OpenSSL 3.1.7 [3 Sep 2024]
 
-OpenSSL 3.0.15 is a security patch release. The most severe CVE fixed in this
+OpenSSL 3.1.7 is a security patch release. The most severe CVE fixed in this
 release is Moderate.
 
 This release incorporates the following bug fixes and mitigations:
@@ -57,7 +50,7 @@ This release incorporates the following bug fixes and mitigations:
   * Fixed possible buffer overread in SSL_select_next_proto()
     ([CVE-2024-5535])
 
-### Major changes between OpenSSL 3.0.13 and OpenSSL 3.0.14 [4 Jun 2024]
+### Major changes between OpenSSL 3.1.5 and OpenSSL 3.1.6 [4 Jun 2024]
 
   * Fixed potential use after free after SSL_free_buffers() is called
     ([CVE-2024-4741])
@@ -69,7 +62,7 @@ This release incorporates the following bug fixes and mitigations:
   * Fixed unbounded memory growth with session handling in TLSv1.3
     ([CVE-2024-2511])
 
-### Major changes between OpenSSL 3.0.12 and OpenSSL 3.0.13 [30 Jan 2024]
+### Major changes between OpenSSL 3.1.4 and OpenSSL 3.1.5 [30 Jan 2024]
 
   * Fixed PKCS12 Decoding crashes
     ([CVE-2024-0727])
@@ -81,23 +74,27 @@ This release incorporates the following bug fixes and mitigations:
   * Fix excessive time spent in DH check / generation with large Q parameter
     value ([CVE-2023-5678])
 
-### Major changes between OpenSSL 3.0.11 and OpenSSL 3.0.12 [24 Oct 2023]
+### Major changes between OpenSSL 3.1.3 and OpenSSL 3.1.4 [24 Oct 2023]
 
   * Mitigate incorrect resize handling for symmetric cipher keys and IVs.
     ([CVE-2023-5363])
 
-### Major changes between OpenSSL 3.0.10 and OpenSSL 3.0.11 [19 Sep 2023]
+### Major changes between OpenSSL 3.1.2 and OpenSSL 3.1.3 [19 Sep 2023]
 
   * Fix POLY1305 MAC implementation corrupting XMM registers on Windows
     ([CVE-2023-4807])
 
-### Major changes between OpenSSL 3.0.9 and OpenSSL 3.0.10 [1 Aug 2023]
+### Major changes between OpenSSL 3.1.1 and OpenSSL 3.1.2 [1 Aug 2023]
 
   * Fix excessive time spent checking DH q parameter value ([CVE-2023-3817])
   * Fix DH_check() excessive time with over sized modulus ([CVE-2023-3446])
   * Do not ignore empty associated data entries with AES-SIV ([CVE-2023-2975])
+  * When building with the `enable-fips` option and using the resulting
+    FIPS provider, TLS 1.2 will, by default, mandate the use of an
+    extended master secret and the Hash and HMAC DRBGs will not operate
+    with truncated digests.
 
-### Major changes between OpenSSL 3.0.8 and OpenSSL 3.0.9 [30 May 2023]
+### Major changes between OpenSSL 3.1.0 and OpenSSL 3.1.1 [30 May 2023]
 
   * Mitigate for very slow `OBJ_obj2txt()` performance with gigantic OBJECT
     IDENTIFIER sub-identities.  ([CVE-2023-2650])
@@ -107,6 +104,17 @@ This release incorporates the following bug fixes and mitigations:
   * Fixed handling of invalid certificate policies in leaf certificates
     ([CVE-2023-0465])
   * Limited the number of nodes created in a policy tree ([CVE-2023-0464])
+
+### Major changes between OpenSSL 3.0 and OpenSSL 3.1.0 [14 Mar 2023]
+
+  * SSL 3, TLS 1.0, TLS 1.1, and DTLS 1.0 only work at security level 0.
+  * Performance enhancements and new platform support including new
+    assembler code algorithm implementations.
+  * Deprecated LHASH statistics functions.
+  * FIPS 140-3 compliance changes.
+
+OpenSSL 3.0
+-----------
 
 ### Major changes between OpenSSL 3.0.7 and OpenSSL 3.0.8 [7 Feb 2023]
 
@@ -173,7 +181,7 @@ This release incorporates the following bug fixes and mitigations:
   * Enhanced 'openssl list' with many new options.
   * Added migration guide to man7.
   * Implemented support for fully "pluggable" TLSv1.3 groups.
-  * Added suport for Kernel TLS (KTLS).
+  * Added support for Kernel TLS (KTLS).
   * Changed the license to the Apache License v2.0.
   * Moved all variations of the EVP ciphers CAST5, BF, IDEA, SEED, RC2,
     RC4, RC5, and DES to the legacy provider.
@@ -216,7 +224,7 @@ This release incorporates the following bug fixes and mitigations:
   * Deprecated ERR_put_error(), ERR_get_error_line(), ERR_get_error_line_data(),
     ERR_peek_error_line_data(), ERR_peek_last_error_line_data() and
     ERR_func_error_string().
-  * Added OSSL_PROVIDER_available(), to check provider availibility.
+  * Added OSSL_PROVIDER_available(), to check provider availability.
   * Added 'openssl mac' that uses the EVP_MAC API.
   * Added 'openssl kdf' that uses the EVP_KDF API.
   * Add OPENSSL_info() and 'openssl info' to get built-in data.
@@ -341,7 +349,7 @@ OpenSSL 1.1.1
     * Rewrite of the packet construction code for "safer" packet handling
     * Rewrite of the extension handling code
     For further important information, see the [TLS1.3 page](
-    https://github.com/openssl/openssl/wiki/TLS1.3) in the OpenSSL Wiki.
+    https://wiki.openssl.org/index.php/TLS1.3) in the OpenSSL Wiki.
 
   * Complete rewrite of the OpenSSL random number generator to introduce the
     following capabilities

@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
@@ -212,19 +212,13 @@ int tls_setup_handshake(SSL *s)
 static int get_cert_verify_tbs_data(SSL *s, unsigned char *tls13tbs,
                                     void **hdata, size_t *hdatalen)
 {
-#ifdef CHARSET_EBCDIC
-    static const char servercontext[] = { 0x54, 0x4c, 0x53, 0x20, 0x31, 0x2e,
-     0x33, 0x2c, 0x20, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x20, 0x43, 0x65,
-     0x72, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x56, 0x65, 0x72,
-     0x69, 0x66, 0x79, 0x00 };
-    static const char clientcontext[] = { 0x54, 0x4c, 0x53, 0x20, 0x31, 0x2e,
-     0x33, 0x2c, 0x20, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x20, 0x43, 0x65,
-     0x72, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x56, 0x65, 0x72,
-     0x69, 0x66, 0x79, 0x00 };
-#else
-    static const char servercontext[] = "TLS 1.3, server CertificateVerify";
-    static const char clientcontext[] = "TLS 1.3, client CertificateVerify";
-#endif
+    /* ASCII: "TLS 1.3, server CertificateVerify", in hex for EBCDIC compatibility */
+    static const char servercontext[] = "\x54\x4c\x53\x20\x31\x2e\x33\x2c\x20\x73\x65\x72"
+        "\x76\x65\x72\x20\x43\x65\x72\x74\x69\x66\x69\x63\x61\x74\x65\x56\x65\x72\x69\x66\x79";
+    /* ASCII: "TLS 1.3, client CertificateVerify", in hex for EBCDIC compatibility */
+    static const char clientcontext[] = "\x54\x4c\x53\x20\x31\x2e\x33\x2c\x20\x63\x6c\x69"
+        "\x65\x6e\x74\x20\x43\x65\x72\x74\x69\x66\x69\x63\x61\x74\x65\x56\x65\x72\x69\x66\x79";
+
     if (SSL_IS_TLS13(s)) {
         size_t hashlen;
 
@@ -1967,24 +1961,23 @@ int ssl_choose_client_version(SSL *s, int version, RAW_EXTENSION *extensions)
         real_max = ver_max;
 
     /* Check for downgrades */
-    if (!SSL_IS_DTLS(s) && real_max > s->version) {
-        /* Signal applies to all versions */
-        if (memcmp(tls11downgrade,
+    if (s->version == TLS1_2_VERSION && real_max > s->version) {
+        if (memcmp(tls12downgrade,
                    s->s3.server_random + SSL3_RANDOM_SIZE
-                   - sizeof(tls11downgrade),
-                   sizeof(tls11downgrade)) == 0) {
+                                        - sizeof(tls12downgrade),
+                   sizeof(tls12downgrade)) == 0) {
             s->version = origv;
             SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER,
                      SSL_R_INAPPROPRIATE_FALLBACK);
             return 0;
         }
-        /* Only when accepting TLS1.3 */
-        if (real_max == TLS1_3_VERSION
-            && memcmp(tls12downgrade,
-                      s->s3.server_random + SSL3_RANDOM_SIZE
-                      - sizeof(tls12downgrade),
-                      sizeof(tls12downgrade)) == 0) {
-
+    } else if (!SSL_IS_DTLS(s)
+               && s->version < TLS1_2_VERSION
+               && real_max > s->version) {
+        if (memcmp(tls11downgrade,
+                   s->s3.server_random + SSL3_RANDOM_SIZE
+                                        - sizeof(tls11downgrade),
+                   sizeof(tls11downgrade)) == 0) {
             s->version = origv;
             SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER,
                      SSL_R_INAPPROPRIATE_FALLBACK);

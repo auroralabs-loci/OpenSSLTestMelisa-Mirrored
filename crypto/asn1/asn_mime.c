@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2008-2023 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -96,7 +96,7 @@ int i2d_ASN1_bio_stream(BIO *out, ASN1_VALUE *val, BIO *in, int flags,
      * internally
      */
     else
-        rv = ASN1_item_i2d_bio(it, out, val);
+        ASN1_item_i2d_bio(it, out, val);
     return rv;
 }
 
@@ -168,19 +168,6 @@ static int asn1_write_micalg(BIO *out, STACK_OF(X509_ALGOR) *mdalgs)
             BIO_write(out, ",", 1);
         write_comma = 1;
         md_nid = OBJ_obj2nid(sk_X509_ALGOR_value(mdalgs, i)->algorithm);
-
-        /* RFC 8702 does not define a micalg for SHAKE, assuming "shake-<bitlen>" */
-        if (md_nid == NID_shake128) {
-            if (BIO_puts(out, "shake-128") < 0)
-                goto err;
-            continue;
-        }
-        if (md_nid == NID_shake256) {
-            if (BIO_puts(out, "shake-256") < 0)
-                goto err;
-            continue;
-        }
-
         md = EVP_get_digestbynid(md_nid);
         if (md && md->md_ctrl) {
             int rv;
@@ -217,15 +204,15 @@ static int asn1_write_micalg(BIO *out, STACK_OF(X509_ALGOR) *mdalgs)
 
         case NID_id_GostR3411_94:
             BIO_puts(out, "gostr3411-94");
-            break;
+            goto err;
 
         case NID_id_GostR3411_2012_256:
             BIO_puts(out, "gostr3411-2012-256");
-            break;
+            goto err;
 
         case NID_id_GostR3411_2012_512:
             BIO_puts(out, "gostr3411-2012-512");
-            break;
+            goto err;
 
         default:
             if (have_unknown) {
@@ -285,8 +272,7 @@ int SMIME_write_ASN1_ex(BIO *bio, ASN1_VALUE *val, BIO *data, int flags,
         BIO_printf(bio, "Content-Type: multipart/signed;");
         BIO_printf(bio, " protocol=\"%ssignature\";", mime_prefix);
         BIO_puts(bio, " micalg=\"");
-        if (!asn1_write_micalg(bio, mdalgs))
-            return 0;
+        asn1_write_micalg(bio, mdalgs);
         BIO_printf(bio, "\"; boundary=\"----%s\"%s%s",
                    bound, mime_eol, mime_eol);
         BIO_printf(bio, "This is an S/MIME signed message%s%s",

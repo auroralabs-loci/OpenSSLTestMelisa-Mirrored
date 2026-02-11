@@ -106,6 +106,8 @@ int ossl_bn_gen_dsa_nonce_fixed_top(BIGNUM *out, const BIGNUM *range,
 
 int ossl_bn_miller_rabin_is_prime(const BIGNUM *w, int iterations, BN_CTX *ctx,
                                   BN_GENCB *cb, int enhanced, int *status);
+int ossl_bn_check_generated_prime(const BIGNUM *w, int checks, BN_CTX *ctx,
+                                  BN_GENCB *cb);
 
 const BIGNUM *ossl_bn_get0_small_factors(void);
 

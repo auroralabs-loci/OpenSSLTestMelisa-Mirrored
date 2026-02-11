@@ -23,7 +23,7 @@ or
 
 "Hosted" OpenSSL relies on an external POSIX compatibility layer
 for building (using GNU/Unix shell, compiler, and tools) and at run time.
-For this option you can use Cygwin.
+For this option, you can use Cygwin.
 
 Native builds using Visual C++
 ==============================
@@ -78,11 +78,6 @@ Quick start
     - `perl Configure VC-WIN64-ARM` if you want Windows on Arm (win-arm64)
        OpenSSL or
     - `perl Configure`              to let Configure figure out the platform
-
-    a. If you don't plan to develop OpenSSL yourself and don't need to rebuild,
-       in other words, if you always do a new build, turning off the build
-       dependency feature can speed up build times by up to 50%:
-       `perl Configure no-makedepend`
 
  6. `nmake`
 
@@ -217,7 +212,7 @@ Linking native applications
 
 This section applies to all native builds.
 
-If you link with static OpenSSL libraries then you're expected to
+If you link with static OpenSSL libraries, then you're expected to
 additionally link your application with `WS2_32.LIB`, `GDI32.LIB`,
 `ADVAPI32.LIB`, `CRYPT32.LIB` and `USER32.LIB`. Those developing
 non-interactive service applications might feel concerned about
@@ -225,7 +220,7 @@ linking with `GDI32.LIB` and `USER32.LIB`, as they are justly associated
 with interactive desktop, which is not available to service
 processes. The toolkit is designed to detect in which context it's
 currently executed, GUI, console app or service, and act accordingly,
-namely whether or not to actually make GUI calls. Additionally those
+namely whether to actually make GUI calls. Additionally, those
 who wish to `/DELAYLOAD:GDI32.DLL` and `/DELAYLOAD:USER32.DLL` and
 actually keep them off service process should consider implementing
 and exporting from .exe image in question own `_OPENSSL_isservice` not
@@ -266,5 +261,5 @@ Apart from that, follow the Unix / Linux instructions in INSTALL.md.
 
 NOTE: `make test` and normal file operations may fail in directories
 mounted as text (i.e. `mount -t c:\somewhere /home`) due to Cygwin
-stripping of carriage returns. To avoid this ensure that a binary
+stripping of carriage returns. To avoid this, ensure that a binary
 mount is used, e.g. `mount -b c:\somewhere /home`.

@@ -445,10 +445,23 @@ CRYPTO_R_ILLEGAL_HEX_DIGIT:102:illegal hex digit
 CRYPTO_R_INSUFFICIENT_DATA_SPACE:106:insufficient data space
 CRYPTO_R_INSUFFICIENT_PARAM_SIZE:107:insufficient param size
 CRYPTO_R_INSUFFICIENT_SECURE_DATA_SPACE:108:insufficient secure data space
+CRYPTO_R_INTEGER_OVERFLOW:127:integer overflow
 CRYPTO_R_INVALID_NEGATIVE_VALUE:122:invalid negative value
 CRYPTO_R_INVALID_NULL_ARGUMENT:109:invalid null argument
 CRYPTO_R_INVALID_OSSL_PARAM_TYPE:110:invalid ossl param type
+CRYPTO_R_NO_PARAMS_TO_MERGE:131:no params to merge
+CRYPTO_R_NO_SPACE_FOR_TERMINATING_NULL:128:no space for terminating null
 CRYPTO_R_ODD_NUMBER_OF_DIGITS:103:odd number of digits
+CRYPTO_R_PARAM_CANNOT_BE_REPRESENTED_EXACTLY:123:\
+	param cannot be represented exactly
+CRYPTO_R_PARAM_NOT_INTEGER_TYPE:124:param not integer type
+CRYPTO_R_PARAM_OF_INCOMPATIBLE_TYPE:129:param of incompatible type
+CRYPTO_R_PARAM_UNSIGNED_INTEGER_NEGATIVE_VALUE_UNSUPPORTED:125:\
+	param unsigned integer negative value unsupported
+CRYPTO_R_PARAM_UNSUPPORTED_FLOATING_POINT_FORMAT:130:\
+	param unsupported floating point format
+CRYPTO_R_PARAM_VALUE_TOO_LARGE_FOR_DESTINATION:126:\
+	param value too large for destination
 CRYPTO_R_PROVIDER_ALREADY_EXISTS:104:provider already exists
 CRYPTO_R_PROVIDER_SECTION_ERROR:105:provider section error
 CRYPTO_R_RANDOM_SECTION_ERROR:119:random section error
@@ -981,6 +994,7 @@ PROV_R_BN_ERROR:160:bn error
 PROV_R_CIPHER_OPERATION_FAILED:102:cipher operation failed
 PROV_R_DERIVATION_FUNCTION_INIT_FAILED:205:derivation function init failed
 PROV_R_DIGEST_NOT_ALLOWED:174:digest not allowed
+PROV_R_EMS_NOT_ENABLED:233:ems not enabled
 PROV_R_ENTROPY_SOURCE_STRENGTH_TOO_WEAK:186:entropy source strength too weak
 PROV_R_ERROR_INSTANTIATING_DRBG:188:error instantiating drbg
 PROV_R_ERROR_RETRIEVING_ENTROPY:189:error retrieving entropy
@@ -1118,6 +1132,7 @@ RAND_R_FWRITE_ERROR:123:Error writing file
 RAND_R_GENERATE_ERROR:112:generate error
 RAND_R_INSUFFICIENT_DRBG_STRENGTH:139:insufficient drbg strength
 RAND_R_INTERNAL_ERROR:113:internal error
+RAND_R_INVALID_PROPERTY_QUERY:137:invalid property query
 RAND_R_IN_ERROR_STATE:114:in error state
 RAND_R_NOT_A_REGULAR_FILE:122:Not a regular file
 RAND_R_NOT_INSTANTIATED:115:not instantiated

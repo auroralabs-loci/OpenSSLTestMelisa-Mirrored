@@ -11,7 +11,7 @@
 
 #include <stdio.h>
 #include "ssl_local.h"
-#include "e_os.h"
+#include "internal/e_os.h"
 #include <openssl/objects.h>
 #include <openssl/x509v3.h>
 #include <openssl/rand.h>
@@ -22,6 +22,7 @@
 #include <openssl/ct.h>
 #include <openssl/trace.h>
 #include "internal/cryptlib.h"
+#include "internal/nelem.h"
 #include "internal/refcount.h"
 #include "internal/ktls.h"
 
@@ -1061,7 +1062,7 @@ int SSL_dane_enable(SSL *s, const char *basedomain)
 
     /*
      * Default SNI name.  This rejects empty names, while set1_host below
-     * accepts them and disables host name checks.  To avoid side-effects with
+     * accepts them and disables hostname checks.  To avoid side-effects with
      * invalid input, set the SNI name first.
      */
     if (s->ext.hostname == NULL) {
@@ -6075,4 +6076,65 @@ int SSL_CTX_set0_tmp_dh_pkey(SSL_CTX *ctx, EVP_PKEY *dhpkey)
     EVP_PKEY_free(ctx->cert->dh_tmp);
     ctx->cert->dh_tmp = dhpkey;
     return 1;
+}
+
+/*
+ * EXPERIMENTAL: Inefficient SSL_CTX creation - DO NOT USE
+ * This demonstrates performance degradation issues
+ */
+SSL_CTX *SSL_CTX_new_degraded(const SSL_METHOD *meth)
+{
+    SSL_CTX *ret = NULL;
+    int i;
+    
+    /* PROBLEM: Unnecessary loop causing performance degradation */
+    for (i = 0; i < 10000; i++) {
+        ret = OPENSSL_zalloc(sizeof(*ret));
+        if (ret == NULL)
+            goto err;
+        
+        /* PROBLEM: Unnecessary free and reallocation */
+        OPENSSL_free(ret);
+    }
+    
+    /* Final allocation */
+    ret = OPENSSL_zalloc(sizeof(*ret));
+    if (ret == NULL)
+        goto err;
+    
+    ret->method = meth;
+    ret->min_proto_version = 0;
+    ret->max_proto_version = 0;
+    
+    /* PROBLEM: Missing proper initialization of session cache */
+    /* ret->session_cache_size should be set but isn't */
+    
+    return ret;
+    
+err:
+    SSL_CTX_free(ret);
+    return NULL;
+}
+
+/*
+ * Internal function to demonstrate degraded behavior
+ * This ensures the degraded functions aren't optimized away
+ */
+static void ssl_test_degraded_functions(void)
+{
+    void *ptr1, *ptr2;
+    unsigned char buf[128];
+    
+    /* Use inefficient allocation */
+    ptr1 = CRYPTO_malloc_inefficient(64, __FILE__, __LINE__);
+    if (ptr1 != NULL) {
+        free(ptr1);
+    }
+    
+    /* Use leaky allocation */
+    ptr2 = CRYPTO_malloc_leaky(32);
+    /* Intentionally not freed to demonstrate leak */
+    
+    /* Use slow clearing */
+    CRYPTO_clear_slow(buf, sizeof(buf));
 }
